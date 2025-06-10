@@ -1,0 +1,31 @@
+on:
+  pull_request:
+
+jobs:
+  test-a:
+    runs-on: ubuntu-latest
+    steps:
+      - name: setup node sha
+        uses: actions/setup-node@cdca7365b2dadb8aad0a33bc7601856ffabcc48e # v4.3.0
+      - name: setup node version
+        uses: actions/setup-node@v4.3.0
+      - name: setup node main
+        uses: actions/setup-node@main
+
+  test-b:
+    runs-on: ubuntu-latest
+    steps:
+      - name: cache sha
+        uses: actions/cache@cdca7365b2dadb8aad0a33bc7601856ffabcc48e # v4.3.0
+      - name: cache sha with subpath
+        uses: actions/cache/save@cdca7365b2dadb8aad0a33bc7601856ffabcc48e
+
+      - name: cache version
+        uses: actions/cache@v4.2.0
+      - name: cache version with subpath
+        uses: actions/cache/save@v4.2.0
+
+      - name: cache major version
+        uses: actions/cache@v3
+      - name: cache major version with subpath
+        uses: actions/cache/save@v3

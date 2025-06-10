@@ -1,0 +1,11 @@
+name: install-yarn
+description: Installs yarn
+runs:
+  using: composite
+  steps:
+    - name: with sha
+      uses: actions/setup-node@cdca7365b2dadb8aad0a33bc7601856ffabcc48e # v4.3.0
+    - name: with full version
+      uses: actions/setup-node@v4.3.0
+    - name: with major constraint
+      uses: actions/setup-node@v3
