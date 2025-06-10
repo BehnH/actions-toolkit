@@ -153,12 +153,24 @@ func IsVersionNumber(s string) bool {
 }
 
 func PinAction(files []string, actionName string, version, token string, write bool) {
+	// Get the SHA for the specific version once, outside the file loop
+	_, latestSHA, err := github.GetLatestReleaseWithSHA(token, actionName, version)
+	if err != nil {
+		slog.Error("Failed to get SHA for version", "action", actionName, "version", version, "error", err)
+		return
+	}
+
+	if latestSHA == "" {
+		slog.Warn("No SHA found for version, skipping this action", "action", actionName, "version", version)
+		return
+	}
+
 	for _, f := range files {
 		// Read the file
 		content, err := file.ReadFile(f)
 		if err != nil {
 			slog.Error("Failed to read file", "file", f, "error", err)
-			return
+			continue
 		}
 
 		contentModified := false
@@ -168,24 +180,13 @@ func PinAction(files []string, actionName string, version, token string, write b
 		usesValues, err := file.ParseYAMLForUses(content)
 		if err != nil {
 			slog.Error("Failed to parse file", "file", f, "error", err)
-			return
+			continue
 		}
 
-		// Get the SHA for the specific version
-		_, latestSHA, err := github.GetLatestReleaseWithSHA(token, actionName, version)
-		if err != nil {
-			slog.Error("Failed to get SHA for version", "action", actionName, "version", version, "error", err)
-			return
-		}
+		// Find actions that need to be updated in this file
+		actionsToUpdate := make(map[string]string)
 
-		if latestSHA == "" {
-			slog.Error("No SHA found for version", "action", actionName, "version", version)
-			return
-		}
-
-		// Find the specified action in the uses values
 		for _, uses := range usesValues {
-			// Check if this uses value matches the action we're looking for
 			if strings.HasPrefix(uses, actionName+"@") {
 				parts := strings.Split(uses, "@")
 				if len(parts) != 2 {
@@ -193,47 +194,65 @@ func PinAction(files []string, actionName string, version, token string, write b
 				}
 
 				currentVersion := parts[1]
-				slog.Info("Found action", "action", actionName, "version", currentVersion, "file", f)
 
 				// Skip if version is "main"
 				if currentVersion == "main" {
-					slog.Info("Skipping action with 'main' version", "action", actionName, "file", f)
+					slog.Debug("Skipping action with 'main' version", "action", actionName, "file", f)
 					continue
 				}
 
-				// Update to the specified SHA
-				lines := strings.Split(contentStr, "\n")
-				newLines := make([]string, len(lines))
+				// Check if current version is already a SHA
+				isSHA := len(currentVersion) == 40 && isHexString(currentVersion)
 
-				for i, line := range lines {
-					if strings.Contains(line, actionName+"@"+currentVersion) {
-						// Replace with SHA
-						updatedAction := fmt.Sprintf("%s@%s", actionName, latestSHA)
-						updatedLine := strings.Replace(line, actionName+"@"+currentVersion, updatedAction, 1)
-						newLines[i] = updateVersionComment(updatedLine, version)
-
-						slog.Debug("Updated line", "originalLine", line, "updatedLine", newLines[i])
-					} else {
-						newLines[i] = line
-					}
-				}
-
-				contentStr = strings.Join(newLines, "\n")
-				contentModified = true
-
-				if write {
-					slog.Info("Updated action in memory",
-						"action", actionName,
-						"from", currentVersion,
-						"to", latestSHA,
-						"version", version,
-						"file", f)
+				if isSHA {
+					slog.Debug("Action is already using a SHA, no need to update", "action", actionName, "sha", currentVersion, "file", f)
 				} else {
-					slog.Info("Dry run - not updating file",
-						"action", actionName,
-						"file", f,
-						"hint", "Use --write/-w to update files")
+					actionsToUpdate[actionName] = currentVersion
 				}
+			}
+		}
+
+		// Skip to next file if no actions need updating in this file
+		if len(actionsToUpdate) == 0 {
+			slog.Info("No actions to update in this file", "file", f)
+			continue
+		}
+
+		for _, currentVersion := range actionsToUpdate {
+			slog.Debug("Updating action", "action", actionName, "from", currentVersion, "to", latestSHA, "file", f)
+
+			// Update to the specified SHA
+			lines := strings.Split(contentStr, "\n")
+			newLines := make([]string, len(lines))
+
+			for i, line := range lines {
+				if strings.Contains(line, actionName+"@"+currentVersion) {
+					// Replace with SHA
+					updatedAction := fmt.Sprintf("%s@%s", actionName, latestSHA)
+					updatedLine := strings.Replace(line, actionName+"@"+currentVersion, updatedAction, 1)
+					newLines[i] = updateVersionComment(updatedLine, version)
+
+					slog.Debug("Updated line", "originalLine", line, "updatedLine", newLines[i])
+				} else {
+					newLines[i] = line
+				}
+			}
+
+			contentStr = strings.Join(newLines, "\n")
+			contentModified = true
+
+			if write {
+				slog.Debug("Updated action in memory",
+					"action", actionName,
+					"from", currentVersion,
+					"to", latestSHA,
+					"version", version,
+					"file", f)
+			} else {
+				slog.Info("Dry run - not updating file",
+					"action", actionName,
+					"file", f,
+					"hint", "Use --write/-w to update files")
 			}
 		}
 
@@ -242,7 +261,7 @@ func PinAction(files []string, actionName string, version, token string, write b
 			err = os.WriteFile(f, []byte(contentStr), 0644)
 			if err != nil {
 				slog.Error("Failed to write file", "file", f, "error", err)
-				return
+				continue
 			}
 			slog.Info("Successfully wrote file with pinned action", "file", f)
 		}

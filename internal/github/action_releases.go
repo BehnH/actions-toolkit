@@ -67,7 +67,8 @@ func GetLatestRelease(token string, actionName string, currentVersion string) (s
 
 	// Create a GitHub client with the provided token
 	client := github.NewClient(nil).WithAuthToken(token)
-	return getLatestReleaseWithClient(client, actionName)
+	version, _, err := getLatestReleaseWithClient(client, actionName)
+	return version, err
 }
 
 // GetLatestReleaseWithSHA searches for the latest release of a GitHub action and returns both the version and SHA.
@@ -100,19 +101,39 @@ func GetLatestReleaseWithSHA(token string, actionName string, currentVersion str
 	cacheMutex.RUnlock()
 
 	client := github.NewClient(nil).WithAuthToken(token)
-	version, err := getLatestReleaseWithClient(client, actionName)
+	version, sha, err := getLatestReleaseWithClient(client, actionName)
 	if err != nil {
 		return "", "", err
 	}
 
+	// If we got a SHA directly from getLatestReleaseWithClient, use it
+	if sha != "" {
+		slog.Debug("Using SHA from API call",
+			"action", actionName,
+			"version", version,
+			"sha", sha)
+		return version, sha, nil
+	}
+
+	// If we didn't get a SHA, check the cache
 	cacheMutex.RLock()
 	info, found := releaseCache[baseActionName]
 	cacheMutex.RUnlock()
-	if !found {
-		return version, "", nil
+
+	// If the cache was updated, return the SHA from the cache
+	if found && info.SHA != "" {
+		slog.Debug("Using SHA from cache after API call",
+			"action", actionName,
+			"version", version,
+			"sha", info.SHA)
+		return version, info.SHA, nil
 	}
 
-	return version, info.SHA, nil
+	// If the cache wasn't updated or the SHA is empty, log a warning and return empty SHA
+	slog.Warn("No SHA found for version, skipping this action",
+		"action", actionName,
+		"version", version)
+	return version, "", nil
 }
 
 // getBaseActionName extracts the base action name (org/repo) from the full action name
@@ -176,11 +197,11 @@ func extractMajorVersion(version string) string {
 
 // getLatestReleaseWithClient is an internal function that allows for dependency injection
 // of the GitHub client for testing purposes.
-func getLatestReleaseWithClient(client *github.Client, actionName string) (string, error) {
+func getLatestReleaseWithClient(client *github.Client, actionName string) (string, string, error) {
 	// Parse the action name to extract org and repo
 	parts := strings.SplitN(actionName, "/", 3)
 	if len(parts) < 2 {
-		return "", nil
+		return "", "", nil
 	}
 
 	owner := parts[0]
@@ -197,9 +218,9 @@ func getLatestReleaseWithClient(client *github.Client, actionName string) (strin
 				"action", actionName,
 				"owner", owner,
 				"repo", repo)
-			return "", nil
+			return "", "", nil
 		}
-		return "", err
+		return "", "", err
 	}
 
 	if release == nil || release.TagName == nil {
@@ -207,7 +228,7 @@ func getLatestReleaseWithClient(client *github.Client, actionName string) (strin
 			"action", actionName,
 			"owner", owner,
 			"repo", repo)
-		return "", nil
+		return "", "", nil
 	}
 
 	fullVersion := release.GetTagName()
@@ -219,7 +240,7 @@ func getLatestReleaseWithClient(client *github.Client, actionName string) (strin
 	ref := "refs/tags/" + fullVersion
 	refResp, _, err := client.Git.GetRef(ctx, owner, repo, ref)
 	if err != nil {
-		return "", err
+		return fullVersion, "", err
 	}
 
 	// Get SHA if available
@@ -245,5 +266,5 @@ func getLatestReleaseWithClient(client *github.Client, actionName string) (strin
 		"fullVersion", fullVersion,
 		"sha", sha)
 
-	return fullVersion, nil
+	return fullVersion, sha, nil
 }
