@@ -134,8 +134,8 @@ func PinAllActions(files []string, token string, write bool) {
 	}
 }
 
-// isVersionNumber checks if a string looks like a version number (e.g., 1.2.3 or 1.2)
-func isVersionNumber(s string) bool {
+// IsVersionNumber checks if a string looks like a version number (e.g., 1.2.3 or 1.2)
+func IsVersionNumber(s string) bool {
 	// Remove 'v' prefix if it exists to standardize the check
 	if strings.HasPrefix(s, "v") {
 		s = s[1:]

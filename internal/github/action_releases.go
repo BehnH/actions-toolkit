@@ -20,6 +20,7 @@ import (
 	"context"
 	"log/slog"
 	"net/http"
+	"regexp"
 	"strings"
 	"sync"
 
@@ -128,6 +129,15 @@ func getBaseActionName(actionName string) string {
 func isMajorVersionConstraint(version string) bool {
 	if version == "" {
 		return false
+	}
+
+	// Check if it's an SHA (40 character hexadecimal string)
+	if len(version) == 40 {
+		// Check if it's a hexadecimal string
+		match, _ := regexp.MatchString("^[0-9a-fA-F]+$", version)
+		if match {
+			return false
+		}
 	}
 
 	versionStr := version

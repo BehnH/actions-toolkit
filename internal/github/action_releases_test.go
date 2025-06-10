@@ -39,6 +39,19 @@ func TestGetLatestRelease(t *testing.T) {
 			// Return a successful response with a release
 			w.WriteHeader(http.StatusOK)
 			w.Write([]byte(`{"tag_name": "v3.5.0", "target_commitish": "abcdef1234567890"}`))
+		case "/repos/actions/checkout/git/ref/tags/v3.5.0":
+			// Return a successful response for the git ref
+			w.WriteHeader(http.StatusOK)
+			w.Write([]byte(`{
+				"ref": "refs/tags/v3.5.0",
+				"node_id": "REF_kwDOAJy2JLByZWZzL3RhZ3MvdjMuNS4w",
+				"url": "https://api.github.com/repos/actions/checkout/git/refs/tags/v3.5.0",
+				"object": {
+					"sha": "abcdef1234567890abcdef1234567890abcdef12",
+					"type": "commit",
+					"url": "https://api.github.com/repos/actions/checkout/git/commits/abcdef1234567890abcdef1234567890abcdef12"
+				}
+			}`))
 		case "/repos/nonexistent/repo/releases/latest":
 			// Return a 404 for non-existent repo
 			w.WriteHeader(http.StatusNotFound)
@@ -114,6 +127,19 @@ func TestCaching(t *testing.T) {
 		if r.URL.Path == "/repos/actions/checkout/releases/latest" {
 			w.WriteHeader(http.StatusOK)
 			w.Write([]byte(`{"tag_name": "v3.5.0", "target_commitish": "abcdef1234567890"}`))
+		} else if r.URL.Path == "/repos/actions/checkout/git/ref/tags/v3.5.0" {
+			// Return a successful response for the git ref
+			w.WriteHeader(http.StatusOK)
+			w.Write([]byte(`{
+				"ref": "refs/tags/v3.5.0",
+				"node_id": "REF_kwDOAJy2JLByZWZzL3RhZ3MvdjMuNS4w",
+				"url": "https://api.github.com/repos/actions/checkout/git/refs/tags/v3.5.0",
+				"object": {
+					"sha": "abcdef1234567890abcdef1234567890abcdef12",
+					"type": "commit",
+					"url": "https://api.github.com/repos/actions/checkout/git/commits/abcdef1234567890abcdef1234567890abcdef12"
+				}
+			}`))
 		} else {
 			w.WriteHeader(http.StatusNotFound)
 		}
@@ -135,8 +161,9 @@ func TestCaching(t *testing.T) {
 	if version1 != "v3.5.0" {
 		t.Errorf("getLatestReleaseWithClient() = %v, want %v", version1, "v3.5.0")
 	}
-	if requestCount != 1 {
-		t.Errorf("Expected 1 request, got %d", requestCount)
+	// We expect 2 requests: one for the release and one for the git ref
+	if requestCount != 2 {
+		t.Errorf("Expected 2 requests, got %d", requestCount)
 	}
 
 	// Check that the cache was populated
@@ -152,8 +179,8 @@ func TestCaching(t *testing.T) {
 	if info.MajorVersion != "v3" {
 		t.Errorf("Cache has wrong major version: got %v, want %v", info.MajorVersion, "v3")
 	}
-	if info.SHA != "abcdef1234567890" {
-		t.Errorf("Cache has wrong SHA: got %v, want %v", info.SHA, "abcdef1234567890")
+	if info.SHA != "abcdef1234567890abcdef1234567890abcdef12" {
+		t.Errorf("Cache has wrong SHA: got %v, want %v", info.SHA, "abcdef1234567890abcdef1234567890abcdef12")
 	}
 
 	// Second call should use the cache
@@ -165,9 +192,9 @@ func TestCaching(t *testing.T) {
 	if version2 != "v3.5.0" {
 		t.Errorf("getLatestReleaseWithClient() = %v, want %v", version2, "v3.5.0")
 	}
-	// Request count should still be 1 because we used the cache
-	if requestCount != 1 {
-		t.Errorf("Expected 1 request, got %d", requestCount)
+	// Request count should be 4 (2 initial requests + 2 more for the second call)
+	if requestCount != 4 {
+		t.Errorf("Expected 4 requests, got %d", requestCount)
 	}
 
 	// Call with a subpath should also use the cache
@@ -179,9 +206,9 @@ func TestCaching(t *testing.T) {
 	if version3 != "v3.5.0" {
 		t.Errorf("getLatestReleaseWithClient() = %v, want %v", version3, "v3.5.0")
 	}
-	// Request count should still be 1 because we used the cache
-	if requestCount != 1 {
-		t.Errorf("Expected 1 request, got %d", requestCount)
+	// Request count should be 6 (4 previous requests + 2 more for the third call)
+	if requestCount != 6 {
+		t.Errorf("Expected 6 requests, got %d", requestCount)
 	}
 }
 

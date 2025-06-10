@@ -42,7 +42,7 @@ func updateVersionComment(line string, version string) string {
 	// Check for different comment patterns
 	if len(commentParts) > 0 {
 		// Case 1: Comment starts with a version number (v4.3.0 or 4.3.0)
-		if strings.HasPrefix(commentParts[0], "v") || isVersionNumber(commentParts[0]) {
+  if strings.HasPrefix(commentParts[0], "v") || IsVersionNumber(commentParts[0]) {
 			// Replace the version part, keep any additional text
 			if len(commentParts) > 1 {
 				newComment := version + " " + strings.Join(commentParts[1:], " ")
@@ -74,7 +74,7 @@ func updateVersionComment(line string, version string) string {
 			// Check if there's already a version-looking string anywhere in the comment
 			foundVersion := false
 			for i, part := range commentParts {
-				if (strings.HasPrefix(part, "v") && isVersionNumber(part[1:])) || isVersionNumber(part) {
+    if (strings.HasPrefix(part, "v") && IsVersionNumber(part[1:])) || IsVersionNumber(part) {
 					// Replace this part with the new version
 					commentParts[i] = version
 					foundVersion = true
