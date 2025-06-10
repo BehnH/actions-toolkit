@@ -1,0 +1,11 @@
+on:
+  pull_request:
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - name: setup node with semver
+        uses: actions/setup-node@v4.3.0
+      - name: another step
+        run: echo "This is another step"
