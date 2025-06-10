@@ -1,0 +1,11 @@
+on:
+  pull_request:
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - name: cache with major version
+        uses: actions/cache@v3
+      - name: another step
+        run: echo "This is another step"
