@@ -17,10 +17,12 @@ limitations under the License.
 package cmd
 
 import (
+	"log/slog"
+
+	"github.com/spf13/cobra"
+
 	"github.com/behnh/actions-toolkit/internal/file"
 	"github.com/behnh/actions-toolkit/internal/processor"
-	"github.com/spf13/cobra"
-	"log/slog"
 )
 
 var pinCmd = &cobra.Command{
@@ -76,9 +78,6 @@ https://docs.github.com/en/actions/security-for-github-actions/security-guides/s
 			slog.Error("Either --dir or --file must be specified")
 			return
 		}
-
-		// result := processor.FindActionsInFiles(filesToProcess)
-		// slog.Info("Found the following actions to pin", "actions", result, "count", len(result))
 
 		if all {
 			processor.PinAllActions(filesToProcess, token, write)

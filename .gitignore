@@ -29,4 +29,4 @@ go.work.sum
 .vscode/
 
 # Binary
-actions-toolkit
+./actions-toolkit
