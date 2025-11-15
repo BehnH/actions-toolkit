@@ -5,6 +5,7 @@ go 1.24.4
 require (
 	github.com/aymanbagabas/go-udiff v0.3.1
 	github.com/google/go-github/v72 v72.0.0
+	github.com/google/go-github/v79 v79.0.0
 	github.com/spf13/cobra v1.9.1
 	github.com/stretchr/testify v1.10.0
 	gopkg.in/yaml.v3 v3.0.1
